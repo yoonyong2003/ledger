@@ -1,5 +1,5 @@
-// 파일을 바꾸면 이 버전을 올려야 기존 캐시가 새 파일로 교체된다.
-const CACHE = 'ledger-v3';
+﻿// 파일을 바꾸면 이 버전을 올려야 기존 캐시가 새 파일로 교체된다.
+const CACHE = 'ledger-v4';
 const FILES = [
   './',
   './index.html',

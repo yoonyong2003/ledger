@@ -189,16 +189,23 @@ function render() {
   renderBlocks(has ? m : null);
   renderReport(has ? m : null);
   renderGoal();
+  renderEvents();
 }
 
 // ---------- 올해 목표 저축 ----------
-// 끝난 달(이번 달 이전)의 수입 − 지출을 올해 저축액으로 자동 합산한다.
-function renderGoal() {
+// 올해 끝난 달(이번 달 이전)의 수입 − 지출 합계. 올해 목표와 특별 이벤트가 같은 저축액을 쓴다.
+function yearSavings() {
   const year = today().slice(0, 4);
   const cur = thisMonth();
-  const goal = (state.yearGoals && state.yearGoals[year]) || 0;
   const done = state.months.filter((m) => m.ym.startsWith(year) && m.ym < cur);
   const saved = done.reduce((s, m) => { const t = monthTotals(m); return s + t.income - t.expense; }, 0);
+  return { year, cur, done, saved };
+}
+
+// 끝난 달(이번 달 이전)의 수입 − 지출을 올해 저축액으로 자동 합산한다.
+function renderGoal() {
+  const { year, cur, done, saved } = yearSavings();
+  const goal = (state.yearGoals && state.yearGoals[year]) || 0;
   const signed = (n) => (n > 0 ? '+' : '') + won(n);
 
   $('goalTitle').textContent = `${year}년 목표 저축`;
@@ -513,6 +520,119 @@ function renderEntries(m) {
   }));
 }
 
+// ---------- 특별 이벤트 (여행경비, 이사비용 등) ----------
+// 올해 저축액을 목록 순서대로 이벤트에 배정한다. 앞 이벤트의 목표가 차야 다음 이벤트로 넘어간다.
+function bindMoneyInput(input) {
+  input.addEventListener('input', () => {
+    const digitsBefore = input.value.slice(0, input.selectionStart).replace(/\D/g, '').length;
+    const digits = input.value.replace(/\D/g, '').slice(0, 13);
+    input.value = digits ? Number(digits).toLocaleString('ko-KR') : '';
+    let pos = 0;
+    for (let seen = 0; pos < input.value.length && seen < digitsBefore; pos++) {
+      if (/\d/.test(input.value[pos])) seen++;
+    }
+    input.setSelectionRange(pos, pos);
+  });
+}
+const moneyValue = (input) => Number(input.value.replace(/\D/g, '')) || 0;
+
+function renderEvents() {
+  const events = state.events || [];
+  const { cur, saved } = yearSavings();
+  let pool = Math.max(0, saved);
+
+  const items = events.map((ev, i) => {
+    const alloc = Math.min(ev.target, pool);
+    pool -= alloc;
+    const p = ev.target > 0 ? (alloc / ev.target) * 100 : 0;
+
+    const li = h('li', 'event-item' + (p >= 100 ? ' reached' : ''));
+
+    const head = h('div', 'event-head');
+    const name = document.createElement('input');
+    name.type = 'text';
+    name.className = 'event-name';
+    name.value = ev.name;
+    name.maxLength = 30;
+    name.setAttribute('aria-label', '이벤트 이름');
+    name.addEventListener('change', () => {
+      ev.name = name.value.trim() || ev.name;
+      save();
+      renderEvents();
+    });
+    const tools = h('span', 'event-tools');
+    const mk = (label, title, fn, disabled) => {
+      const b = h('button', 'event-btn', label);
+      b.type = 'button';
+      b.title = title;
+      b.disabled = Boolean(disabled);
+      b.addEventListener('click', fn);
+      return b;
+    };
+    const move = (to) => {
+      [events[i], events[to]] = [events[to], events[i]];
+      save();
+      renderEvents();
+    };
+    tools.append(
+      mk('↑', '위로 (먼저 채움)', () => move(i - 1), i === 0),
+      mk('↓', '아래로', () => move(i + 1), i === events.length - 1),
+      mk('✕', '삭제', () => {
+        if (!confirm(`'${ev.name}' 이벤트를 삭제할까요?`)) return;
+        state.events = events.filter((x) => x.id !== ev.id);
+        save();
+        renderEvents();
+      }),
+    );
+    head.append(name, tools);
+
+    const amountRow = h('label', 'event-amount-row');
+    const amount = document.createElement('input');
+    amount.type = 'text';
+    amount.inputMode = 'numeric';
+    amount.autocomplete = 'off';
+    amount.value = ev.target.toLocaleString('ko-KR');
+    amount.setAttribute('aria-label', '이벤트 목표 금액');
+    bindMoneyInput(amount);
+    amount.addEventListener('change', () => {
+      ev.target = Math.max(1, moneyValue(amount));
+      save();
+      renderEvents();
+    });
+    amountRow.append(amount, document.createTextNode(' 원'));
+
+    const bar = h('div', 'goal-bar');
+    bar.setAttribute('aria-hidden', 'true');
+    const fill = h('div', 'goal-fill' + (p >= 100 ? ' reached' : ''));
+    fill.style.width = Math.min(100, p) + '%';
+    bar.append(fill);
+
+    const pctLine = h('p', 'event-pct', p >= 100 ? `${pct(p)} · 목표 달성!` : `목표의 ${pct(p)} 저축`);
+    const detail = h('p', 'goal-line', `${won(alloc)} / ${won(ev.target)}`);
+    li.append(head, amountRow, bar, pctLine, detail);
+
+    if (p < 100) {
+      const left = ev.target - alloc;
+      if (ev.due) {
+        const [dy, dm] = ev.due.split('-').map(Number);
+        const [cy, cm] = cur.split('-').map(Number);
+        const monthsLeft = dy * 12 + dm - (cy * 12 + cm) + 1; // 이번 달 포함
+        li.append(h('p', 'goal-line', monthsLeft > 0
+          ? `${ymLabel(ev.due)}까지 남은 ${monthsLeft}개월 동안 월 ${won(Math.ceil(left / monthsLeft))}씩 · 남은 ${won(left)}`
+          : `${ymLabel(ev.due)} 기한이 지났어요 · 남은 ${won(left)}`));
+      } else {
+        li.append(h('p', 'goal-line', `남은 ${won(left)}`));
+      }
+    }
+    return li;
+  });
+
+  $('eventList').replaceChildren(...(items.length ? items : [h('li', 'event-empty', '여행, 이사처럼 따로 모을 목표를 추가해 보세요.')]));
+  $('eventLeftover').textContent = events.length
+    ? (pool > 0 ? `이벤트에 배정하고 남은 올해 저축 ${won(pool)}` : '올해 저축을 이벤트에 모두 배정했어요')
+    : '';
+}
+
 // ---------- 월 결산 · 소비 피드백 ----------
 // 외부 AI를 호출하지 않고, 입력된 내역만으로 계산한 규칙 기반 분석이다.
 const FIXED_CATS = ['주거/통신'];
@@ -732,16 +852,17 @@ el.monthForm.addEventListener('submit', (ev) => {
 });
 el.deleteMonth.addEventListener('click', deleteMonth);
 // 입력하는 동안 3자리마다 쉼표를 넣는다 (커서 위치는 숫자 기준으로 유지)
-$('goalInput').addEventListener('input', (ev) => {
-  const input = ev.target;
-  const digitsBefore = input.value.slice(0, input.selectionStart).replace(/\D/g, '').length;
-  const digits = input.value.replace(/\D/g, '').slice(0, 13);
-  input.value = digits ? Number(digits).toLocaleString('ko-KR') : '';
-  let pos = 0;
-  for (let seen = 0; pos < input.value.length && seen < digitsBefore; pos++) {
-    if (/\d/.test(input.value[pos])) seen++;
-  }
-  input.setSelectionRange(pos, pos);
+bindMoneyInput($('goalInput'));
+bindMoneyInput($('evAmount'));
+$('eventForm').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const name = $('evName').value.trim();
+  const target = moneyValue($('evAmount'));
+  if (!name || target <= 0) return;
+  (state.events = state.events || []).push({ id: uid(), name, target, due: $('evDue').value || '' });
+  $('eventForm').reset();
+  save();
+  renderEvents();
 });
 $('goalInput').addEventListener('change', (ev) => {
   const v = Number(ev.target.value.replace(/\D/g, '')) || 0;

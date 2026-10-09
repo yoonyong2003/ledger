@@ -46,6 +46,20 @@
         </section>
 
         <ul class="month-list" id="monthList"></ul>
+
+        <section class="event-section" aria-label="특별 이벤트 저축">
+          <h2 class="event-title">특별 이벤트</h2>
+          <ul class="event-list" id="eventList"></ul>
+          <p class="event-leftover" id="eventLeftover"></p>
+          <form class="event-form" id="eventForm">
+            <input type="text" id="evName" placeholder="이벤트 이름 (예: 여행경비)" maxlength="30" aria-label="이벤트 이름" required>
+            <div class="event-form-row">
+              <input type="text" id="evAmount" inputmode="numeric" autocomplete="off" placeholder="목표 금액" aria-label="이벤트 목표 금액" required>
+              <input type="month" id="evDue" aria-label="목표 달성 월 (선택)" title="목표 달성 월 (선택)">
+            </div>
+            <button type="submit" class="btn-new">+ 이벤트 추가</button>
+          </form>
+        </section>
       </div>
     </aside>
 
