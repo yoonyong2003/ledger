@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>가계부</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1b9ad6">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="가계부">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <header class="sidebar-header">
+        <h1>가계부</h1>
+      </header>
+
+      <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-expanded="false" aria-controls="monthPanel">
+        <span id="toggleLabel">월 선택</span>
+        <span class="chevron" aria-hidden="true"></span>
+      </button>
+
+      <div class="month-panel" id="monthPanel">
+        <form class="month-add" id="monthAddForm">
+          <input type="month" id="newMonth" aria-label="추가할 월" required>
+          <button type="submit" class="btn-new">+ 추가</button>
+        </form>
+
+        <section class="goal-card" aria-label="올해 목표 저축">
+          <h2 class="goal-title" id="goalTitle">올해 목표 저축</h2>
+          <label class="goal-input-row">
+            <input type="text" id="goalInput" inputmode="numeric" autocomplete="off" placeholder="예: 30,000,000" aria-label="올해 목표 저축 금액">
+            <span>원</span>
+          </label>
+          <div class="goal-bar" aria-hidden="true"><div class="goal-fill" id="goalFill"></div></div>
+          <p class="goal-pct" id="goalPct"></p>
+          <p class="goal-line" id="goalSaved"></p>
+          <p class="goal-line" id="goalRemain"></p>
+          <p class="goal-hint" id="goalHint"></p>
+        </section>
+
+        <ul class="month-list" id="monthList"></ul>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="main-head">
+        <h2 class="main-title" id="mainTitle"></h2>
+        <button type="button" class="btn-danger" id="deleteMonthBtn">이 달 삭제</button>
+      </div>
+
+      <section class="summary" aria-label="이번 달 요약">
+        <div class="card">
+          <span class="card-label">수입</span>
+          <strong class="card-value income" id="sumIncome">0원</strong>
+        </div>
+        <div class="card">
+          <span class="card-label">지출</span>
+          <strong class="card-value expense" id="sumExpense">0원</strong>
+        </div>
+        <div class="card">
+          <span class="card-label">잔액</span>
+          <strong class="card-value balance" id="sumBalance">0원</strong>
+        </div>
+      </section>
+
+      <form class="entry-form" id="entryForm">
+        <div class="type-toggle" role="group" aria-label="구분">
+          <button type="button" class="type-btn active" data-type="expense">지출</button>
+          <button type="button" class="type-btn" data-type="income">수입</button>
+        </div>
+        <input type="date" id="fDate" aria-label="날짜" required>
+        <select id="fCat" aria-label="카테고리"></select>
+        <input type="text" id="fMemo" placeholder="메모" aria-label="메모" maxlength="60">
+        <input type="number" id="fAmount" placeholder="금액" min="1" step="1" aria-label="금액" required>
+        <button type="submit" class="btn-add" id="submitBtn">추가</button>
+        <button type="button" class="btn-cancel" id="cancelBtn" hidden>취소</button>
+      </form>
+
+      <section class="history" aria-label="내역">
+        <h3>내역</h3>
+        <ul class="tx-list" id="txList"></ul>
+      </section>
+
+      <section class="memo" id="memoSection" aria-label="월 메모">
+        <h3>월 메모</h3>
+        <p class="memo-hint">Enter로 새 블록, 빈 블록에서 Backspace로 삭제, 빈 블록에서 <kbd>/</kbd>로 종류 선택. <kbd>#</kbd> 제목 · <kbd>-</kbd> 목록 · <kbd>[]</kbd> 체크리스트 (뒤에 띄어쓰기)</p>
+        <div class="blocks" id="blockList"></div>
+      </section>
+
+      <section class="report" id="reportSection" aria-label="월 결산과 소비 피드백" hidden>
+        <div class="report-head">
+          <h3>월 결산 · 소비 피드백</h3>
+          <span class="report-badge" id="reportBadge"></span>
+        </div>
+        <div id="reportBody"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
